@@ -7,8 +7,8 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-from .config import load_config
-from .db import init_db
+from .config import hydrate_chat_id_from_db, load_config
+from .db import init_db, set_meta
 from .scheduler import send_next_unsent, start_scheduler
 
 
@@ -21,6 +21,16 @@ log = logging.getLogger("dire-ne-pas-dire-telegram-bot")
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     assert update.effective_chat
+    application = context.application
+    cfg = application.bot_data["cfg"]
+    # Auto-enregistre le chat_id si absent (dans la base, pour les redémarrages).
+    if cfg.chat_id is None and update.effective_chat:
+        chat_id = update.effective_chat.id
+        set_meta(cfg.db_path, "chat_id", str(chat_id))
+        cfg = hydrate_chat_id_from_db(cfg)
+        application.bot_data["cfg"] = cfg
+        _start_scheduler_if_needed(application)
+
     await update.message.reply_text(
         "OK. Utilise /identifiant pour récupérer ton CHAT_ID.\n"
         "Utilise /prochain (ou /article) pour recevoir le prochain article non envoyé.",
@@ -44,6 +54,13 @@ async def cmd_next(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def post_init(application: Application) -> None:
+    _start_scheduler_if_needed(application)
+
+
+def _start_scheduler_if_needed(application: Application) -> None:
+    # Démarre une seule fois (post_init ou après auto-enregistrement du chat_id).
+    if application.bot_data.get("scheduler_started"):
+        return
     cfg = application.bot_data["cfg"]
     if cfg.chat_id is None:
         log.warning("CHAT_ID absent: le scheduler ne démarrera pas tant qu’il n’est pas configuré.")
@@ -56,16 +73,13 @@ async def post_init(application: Application) -> None:
         daily_time=cfg.daily_time,
         check_interval_min=cfg.check_interval_min,
     )
-    await application.bot.send_message(
-        chat_id=cfg.chat_id,
-        text="Bot démarré. Envoi quotidien + vérification de nouveaux articles activés.",
-        parse_mode=ParseMode.MARKDOWN,
-    )
+    application.bot_data["scheduler_started"] = True
 
 
 def build_app() -> Application:
     cfg = load_config()
     init_db(cfg.db_path)
+    cfg = hydrate_chat_id_from_db(cfg)
 
     application = (
         Application.builder()
@@ -74,6 +88,7 @@ def build_app() -> Application:
         .build()
     )
     application.bot_data["cfg"] = cfg
+    application.bot_data["scheduler_started"] = False
 
     # Commandes en français (avec alias anglais pour compatibilité éventuelle).
     application.add_handler(CommandHandler(["start", "demarrer"], cmd_start))

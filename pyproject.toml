@@ -15,5 +15,8 @@ dependencies = [
   "beautifulsoup4==4.12.3",
 ]
 
+[project.scripts]
+dnpd-telegram-bot = "bot.main:main"
+
 [tool.setuptools]
 packages = ["bot"]

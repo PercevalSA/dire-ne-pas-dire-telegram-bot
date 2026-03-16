@@ -10,11 +10,23 @@ Bot Telegram qui t’envoie chaque jour un article “dire, ne pas dire” de l�
 
 ## Installation
 
+### Installation locale manuelle
+
 ```bash
+# cloner le dépôt
+git clone https://github.com/PercevalSA/dire-ne-pas-dire-telegram-bot.git
 cd dire-ne-pas-dire-telegram-bot
+
+# installation locale
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .
+python -m pip install .
+```
+
+### Installation pour déploiement 
+
+```bash
+python3 -m pip install https://github.com/PercevalSA/dire-ne-pas-dire-telegram-bot.git
 ```
 
 ## Configuration
@@ -42,8 +54,11 @@ export DB_PATH="/var/lib/dire-ne-pas-dire-telegram-bot/bot.db"
 ## Lancer en local
 
 ```bash
+venv .venv
 source .venv/bin/activate
-python -m bot.main
+python -m pip install .
+export BOT_TOKEN="123:abc"
+python -m dire_ne_pas_dire_telegram_bot
 ```
 
 Dans Telegram :
@@ -53,40 +68,23 @@ Dans Telegram :
 
 ## Déploiement Linux (systemd)
 
-1) Crée un dossier de données (ex. `/var/lib/dire-ne-pas-dire-telegram-bot`) et donne les droits à l’utilisateur du service.
+Ici on suppose une installation pour déploiement.
 
-2) Crée un fichier d’environnement, par exemple `/etc/dire-ne-pas-dire-telegram-bot.env` :
+- `systemd` crée automatiquement le dossier de données via `StateDirectory=`
+- l’utilisateur du service peut être créé automatiquement via `DynamicUser=yes`
+- systemd` créé automatiquement le fichier de configuration dans `StateDirectory`
 
-```bash
-BOT_TOKEN="..."
-CHAT_ID="..."
-TZ="Europe/Paris"
-DAILY_TIME="09:00"
-CHECK_INTERVAL_MIN="60"
-DB_PATH="/var/lib/dire-ne-pas-dire-telegram-bot/bot.db"
+
+ 1. Ajoute le token du bot dans le fichier d’environnement
+ 2. Copie l’unité systemd fournie par le projet
+    ```bash
+    wget -O dire-ne-pas-dire-telegram-bot.service https://raw.githubusercontent.com/PercevalSA/dire-ne-pas-dire-telegram-bot/main/deploy/dire-ne-pas-dire-telegram-bot.service
+    sudo cp dire-ne-pas-dire-telegram-bot.service /etc/systemd/system/dire-ne-pas-dire-telegram-bot.service
+    ```
+sudo /opt/dnpd-telegram-bot/venv/bin/pip install dire-ne-pas-dire-telegram-bot
 ```
 
-3) Unité systemd (ex. `/etc/systemd/system/dire-ne-pas-dire-telegram-bot.service`) :
-
-```ini
-[Unit]
-Description=Academie francaise Dire-ne-pas-dire Telegram bot
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-WorkingDirectory=dire-ne-pas-dire-telegram-bot
-EnvironmentFile=/etc/dire-ne-pas-dire-telegram-bot.env
-ExecStart=dire-ne-pas-dire-telegram-bot/.venv/bin/python -m bot.main
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-4) Active et démarre :
+4) Recharge systemd et démarre le service :
 
 ```bash
 sudo systemctl daemon-reload

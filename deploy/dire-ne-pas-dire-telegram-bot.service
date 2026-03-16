@@ -1,0 +1,25 @@
+[Unit]
+Description=Robot Telegram Academie francaise Dire ne pas dire
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=dire-ne-pas-dire-telegram-bot
+WorkingDirectory=%S/dire-ne-pas-dire-telegram-bot
+EnvironmentFile=-%S/dire-ne-pas-dire-telegram-bot/environment
+ExecStart=dnpd-telegram-bot
+Restart=on-failure
+RestartSec=5
+
+# Hardening (safe defaults)
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=%S/dire-ne-pas-dire-telegram-bot
+
+[Install]
+WantedBy=multi-user.target
+

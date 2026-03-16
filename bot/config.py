@@ -42,7 +42,71 @@ def _default_db_path() -> str:
     return str(Path.home() / ".local" / "share" / "dire-ne-pas-dire-telegram-bot" / "bot.db")
 
 
+def env_example_path(db_path: str) -> Path:
+    parent = Path(db_path).expanduser().resolve().parent
+    return parent / "dire-ne-pas-dire-telegram-bot.env.example"
+
+
+def ensure_env_example(db_path: str) -> Path | None:
+    """
+    Write an env template next to the database if missing.
+    Useful on servers where only the venv is deployed (pip install), not the repo.
+    """
+    try:
+        p = env_example_path(db_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        if p.exists():
+            return p
+        p.write_text(
+            "\n".join(
+                [
+                    "# Fichier d'exemple (ne pas utiliser tel quel).",
+                    "#",
+                    "# BOT_TOKEN et CHAT_ID sont commentés pour éviter d'écraser",
+                    "# une valeur déjà stockée en base ou fournie autrement.",
+                    "# Décommente BOT_TOKEN pour démarrer le bot.",
+                    "#",
+                    '#BOT_TOKEN="123:abc"',
+                    "#CHAT_ID=\"123456789\"",
+                    "TZ=\"Europe/Paris\"",
+                    "DAILY_TIME=\"09:00\"",
+                    "CHECK_INTERVAL_MIN=\"60\"",
+                    f"DB_PATH=\"{db_path}\"",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        return p
+    except Exception:
+        return None
+
+
+def hydrate_chat_id_from_db(cfg: Config) -> Config:
+    if cfg.chat_id is not None:
+        return cfg
+    try:
+        from .db import get_meta
+
+        raw = (get_meta(cfg.db_path, "chat_id") or "").strip()
+        if not raw:
+            return cfg
+        return Config(
+            bot_token=cfg.bot_token,
+            chat_id=int(raw),
+            tz=cfg.tz,
+            daily_time=cfg.daily_time,
+            check_interval_min=cfg.check_interval_min,
+            db_path=cfg.db_path,
+        )
+    except Exception:
+        return cfg
+
+
 def load_config() -> Config:
+    db_path = os.getenv("DB_PATH", "").strip() or _default_db_path()
+    ensure_env_example(db_path)
+
     bot_token = os.getenv("BOT_TOKEN", "").strip()
     if not bot_token:
         raise RuntimeError("Missing BOT_TOKEN environment variable.")
@@ -53,7 +117,6 @@ def load_config() -> Config:
     tz = os.getenv("TZ", "Europe/Paris").strip() or "Europe/Paris"
     daily_time = os.getenv("DAILY_TIME", "09:00").strip() or "09:00"
     check_interval_min = _get_int("CHECK_INTERVAL_MIN", 60)
-    db_path = os.getenv("DB_PATH", "").strip() or _default_db_path()
 
     return Config(
         bot_token=bot_token,
