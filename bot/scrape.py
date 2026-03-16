@@ -36,7 +36,7 @@ def fetch_latest_articles(limit: int = 30, timeout_s: int = 20) -> list[Article]
         INDEX,
         timeout=timeout_s,
         headers={
-            "User-Agent": "academie-fr-dnpd-tgbot/1.0 (+https://t.me/)",
+            "User-Agent": "dire-ne-pas-dire-telegram-bot/1.0 (+https://t.me/)",
             "Accept": "text/html,application/xhtml+xml",
         },
     )
@@ -225,7 +225,7 @@ def fetch_article_content(article: Article, timeout_s: int = 20) -> ArticleConte
         article.url,
         timeout=timeout_s,
         headers={
-            "User-Agent": "academie-fr-dnpd-tgbot/1.0 (+https://t.me/)",
+            "User-Agent": "dire-ne-pas-dire-telegram-bot/1.0 (+https://t.me/)",
             "Accept": "text/html,application/xhtml+xml",
         },
     )

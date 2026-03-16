@@ -11,7 +11,7 @@ Bot Telegram qui t’envoie chaque jour un article “dire, ne pas dire” de l�
 ## Installation
 
 ```bash
-cd /home/perceval/funspace/academie-fr-dnpd-tgbot
+cd dire-ne-pas-dire-telegram-bot
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
@@ -26,7 +26,7 @@ Variables d’environnement attendues :
 - `TZ` (optionnel) : timezone, défaut `Europe/Paris`
 - `DAILY_TIME` (optionnel) : heure d’envoi quotidien `HH:MM`, défaut `09:00`
 - `CHECK_INTERVAL_MIN` (optionnel) : minutes entre vérifications “nouvel article”, défaut `60`
-- `DB_PATH` (optionnel) : chemin SQLite. Par défaut `/var/lib/academie-fr-dnpd-tgbot/bot.db` (si writable), sinon `~/.local/share/academie-fr-dnpd-tgbot/bot.db`
+- `DB_PATH` (optionnel) : chemin SQLite. Par défaut `/var/lib/dire-ne-pas-dire-telegram-bot/bot.db` (si writable), sinon `~/.local/share/dire-ne-pas-dire-telegram-bot/bot.db`
 
 Exemple :
 
@@ -36,7 +36,7 @@ export CHAT_ID="123456789"
 export TZ="Europe/Paris"
 export DAILY_TIME="09:00"
 export CHECK_INTERVAL_MIN="60"
-export DB_PATH="/var/lib/academie-fr-dnpd-tgbot/bot.db"
+export DB_PATH="/var/lib/dire-ne-pas-dire-telegram-bot/bot.db"
 ```
 
 ## Lancer en local
@@ -47,15 +47,15 @@ python -m bot.main
 ```
 
 Dans Telegram :
-- `/start` pour confirmer que le bot répond
-- `/chatid` pour voir l’id du chat (debug)
-- `/next` pour recevoir immédiatement le prochain article non envoyé
+- `/demarrer` (ou `/start`) pour confirmer que le bot répond
+- `/identifiant` (ou `/chatid`) pour voir l’id du chat (debug)
+- `/prochain` ou `/article` (ou `/next`) pour recevoir immédiatement le prochain article non envoyé
 
 ## Déploiement Linux (systemd)
 
-1) Crée un dossier de données (ex. `/var/lib/academie-fr-dnpd-tgbot`) et donne les droits à l’utilisateur du service.
+1) Crée un dossier de données (ex. `/var/lib/dire-ne-pas-dire-telegram-bot`) et donne les droits à l’utilisateur du service.
 
-2) Crée un fichier d’environnement, par exemple `/etc/academie-fr-dnpd-tgbot.env` :
+2) Crée un fichier d’environnement, par exemple `/etc/dire-ne-pas-dire-telegram-bot.env` :
 
 ```bash
 BOT_TOKEN="..."
@@ -63,10 +63,10 @@ CHAT_ID="..."
 TZ="Europe/Paris"
 DAILY_TIME="09:00"
 CHECK_INTERVAL_MIN="60"
-DB_PATH="/var/lib/academie-fr-dnpd-tgbot/bot.db"
+DB_PATH="/var/lib/dire-ne-pas-dire-telegram-bot/bot.db"
 ```
 
-3) Unité systemd (ex. `/etc/systemd/system/academie-fr-dnpd-tgbot.service`) :
+3) Unité systemd (ex. `/etc/systemd/system/dire-ne-pas-dire-telegram-bot.service`) :
 
 ```ini
 [Unit]
@@ -76,9 +76,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/perceval/funspace/academie-fr-dnpd-tgbot
-EnvironmentFile=/etc/academie-fr-dnpd-tgbot.env
-ExecStart=/home/perceval/funspace/academie-fr-dnpd-tgbot/.venv/bin/python -m bot.main
+WorkingDirectory=dire-ne-pas-dire-telegram-bot
+EnvironmentFile=/etc/dire-ne-pas-dire-telegram-bot.env
+ExecStart=dire-ne-pas-dire-telegram-bot/.venv/bin/python -m bot.main
 Restart=on-failure
 RestartSec=5
 
@@ -90,7 +90,7 @@ WantedBy=multi-user.target
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now academie-fr-dnpd-tgbot.service
-sudo systemctl status academie-fr-dnpd-tgbot.service
+sudo systemctl enable --now dire-ne-pas-dire-telegram-bot.service
+sudo systemctl status dire-ne-pas-dire-telegram-bot.service
 ```
 

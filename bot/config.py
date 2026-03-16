@@ -26,7 +26,7 @@ def _default_db_path() -> str:
     Prefer system-wide state directory on Linux.
     If not writable (e.g. running as an unprivileged user), fallback to user data dir.
     """
-    system_path = Path("/var/lib/academie-fr-dnpd-tgbot/bot.db")
+    system_path = Path("/var/lib/dire-ne-pas-dire-telegram-bot/bot.db")
     try:
         parent = system_path.parent
         if parent.exists() and os.access(parent, os.W_OK):
@@ -38,8 +38,8 @@ def _default_db_path() -> str:
 
     xdg = os.getenv("XDG_DATA_HOME", "").strip()
     if xdg:
-        return str(Path(xdg) / "academie-fr-dnpd-tgbot" / "bot.db")
-    return str(Path.home() / ".local" / "share" / "academie-fr-dnpd-tgbot" / "bot.db")
+        return str(Path(xdg) / "dire-ne-pas-dire-telegram-bot" / "bot.db")
+    return str(Path.home() / ".local" / "share" / "dire-ne-pas-dire-telegram-bot" / "bot.db")
 
 
 def load_config() -> Config:

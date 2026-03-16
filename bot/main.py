@@ -16,14 +16,14 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s - %(message)s",
 )
-log = logging.getLogger("academie-fr-dnpd-tgbot")
+log = logging.getLogger("dire-ne-pas-dire-telegram-bot")
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     assert update.effective_chat
     await update.message.reply_text(
-        "OK. Utilise /chatid pour récupérer ton CHAT_ID.\n"
-        "Utilise /next pour recevoir le prochain article non envoyé.",
+        "OK. Utilise /identifiant pour récupérer ton CHAT_ID.\n"
+        "Utilise /prochain (ou /article) pour recevoir le prochain article non envoyé.",
     )
 
 
@@ -75,9 +75,10 @@ def build_app() -> Application:
     )
     application.bot_data["cfg"] = cfg
 
-    application.add_handler(CommandHandler("start", cmd_start))
-    application.add_handler(CommandHandler("chatid", cmd_chatid))
-    application.add_handler(CommandHandler("next", cmd_next))
+    # Commandes en français (avec alias anglais pour compatibilité éventuelle).
+    application.add_handler(CommandHandler(["start", "demarrer"], cmd_start))
+    application.add_handler(CommandHandler(["identifiant", "chatid"], cmd_chatid))
+    application.add_handler(CommandHandler(["prochain", "article", "next"], cmd_next))
 
     return application
 
