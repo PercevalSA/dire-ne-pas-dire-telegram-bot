@@ -10,7 +10,7 @@ from telegram.constants import ParseMode
 from telegram.ext import Application
 
 from .db import has_sent, mark_sent
-from .scrape import fetch_latest_articles, format_message
+from .scrape import fetch_article_content, fetch_latest_articles, format_article_html, split_telegram_text
 
 log = logging.getLogger(__name__)
 
@@ -19,12 +19,15 @@ async def send_next_unsent(application: Application, db_path: str, chat_id: int)
     articles = fetch_latest_articles(limit=60)
     for a in articles:
         if not has_sent(db_path, a.url):
-            await application.bot.send_message(
-                chat_id=chat_id,
-                text=format_message(a),
-                parse_mode=ParseMode.MARKDOWN,
-                disable_web_page_preview=False,
-            )
+            content = fetch_article_content(a)
+            html = format_article_html(content)
+            for chunk in split_telegram_text(html):
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text=chunk,
+                    parse_mode=ParseMode.HTML,
+                    disable_web_page_preview=True,
+                )
             mark_sent(db_path, a.url, a.title)
             return True
     return False
@@ -37,12 +40,15 @@ async def send_if_new_latest(application: Application, db_path: str, chat_id: in
     latest = articles[0]
     if has_sent(db_path, latest.url):
         return False
-    await application.bot.send_message(
-        chat_id=chat_id,
-        text=format_message(latest),
-        parse_mode=ParseMode.MARKDOWN,
-        disable_web_page_preview=False,
-    )
+    content = fetch_article_content(latest)
+    html = format_article_html(content)
+    for chunk in split_telegram_text(html):
+        await application.bot.send_message(
+            chat_id=chat_id,
+            text=chunk,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True,
+        )
     mark_sent(db_path, latest.url, latest.title)
     return True
 
