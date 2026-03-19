@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from importlib.resources import files
 from pathlib import Path
 
 
@@ -57,26 +58,12 @@ def ensure_env_example(db_path: str) -> Path | None:
         p.parent.mkdir(parents=True, exist_ok=True)
         if p.exists():
             return p
-        p.write_text(
-            "\n".join(
-                [
-                    "# Fichier d'exemple (ne pas utiliser tel quel).",
-                    "#",
-                    "# BOT_TOKEN et CHAT_ID sont commentés pour éviter d'écraser",
-                    "# une valeur déjà stockée en base ou fournie autrement.",
-                    "# Décommente BOT_TOKEN pour démarrer le bot.",
-                    "#",
-                    '#BOT_TOKEN="123:abc"',
-                    "#CHAT_ID=\"123456789\"",
-                    "TZ=\"Europe/Paris\"",
-                    "DAILY_TIME=\"09:00\"",
-                    "CHECK_INTERVAL_MIN=\"60\"",
-                    f"DB_PATH=\"{db_path}\"",
-                    "",
-                ]
-            ),
-            encoding="utf-8",
+        template = (
+            files("bot")
+            .joinpath("dire-ne-pas-dire-telegram-bot.env.example")
+            .read_text(encoding="utf-8")
         )
+        p.write_text(template.format(db_path=db_path), encoding="utf-8")
         return p
     except Exception:
         return None

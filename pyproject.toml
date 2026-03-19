@@ -20,3 +20,6 @@ dnpd-telegram-bot = "bot.main:main"
 
 [tool.setuptools]
 packages = ["bot"]
+
+[tool.setuptools.package-data]
+bot = ["*.example"]
