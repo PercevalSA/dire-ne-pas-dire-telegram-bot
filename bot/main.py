@@ -3,12 +3,11 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from telegram import Update
-from telegram.constants import ParseMode
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram import ChatMemberUpdated, Update
+from telegram.ext import Application, ChatMemberHandler, CommandHandler, ContextTypes
 
-from .config import hydrate_chat_id_from_db, load_config
-from .db import init_db, set_meta
+from .config import load_config
+from .db import delete_user, init_db, upsert_user
 from .scheduler import send_next_unsent, start_scheduler
 
 
@@ -18,57 +17,103 @@ logging.basicConfig(
 )
 log = logging.getLogger("dire-ne-pas-dire-telegram-bot")
 
+INACTIVE_CHAT_MEMBER_STATUSES = {"left", "kicked"}
+
+
+def _register_effective_user(update: Update, db_path: str) -> bool:
+    chat = update.effective_chat
+    user = update.effective_user
+    if chat is None or user is None or chat.type != "private":
+        return False
+
+    upsert_user(
+        db_path,
+        user_id=user.id,
+        chat_id=chat.id,
+        username=user.username,
+        first_name=user.first_name,
+        last_name=user.last_name,
+    )
+    return True
+
+
+def _extract_was_active_is_active(chat_member_update: ChatMemberUpdated) -> tuple[bool, bool]:
+    old_status = chat_member_update.old_chat_member.status
+    new_status = chat_member_update.new_chat_member.status
+    was_active = old_status not in INACTIVE_CHAT_MEMBER_STATUSES
+    is_active = new_status not in INACTIVE_CHAT_MEMBER_STATUSES
+    return was_active, is_active
+
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    assert update.effective_chat
-    application = context.application
-    cfg = application.bot_data["cfg"]
-    # Auto-enregistre le chat_id si absent (dans la base, pour les redémarrages).
-    if cfg.chat_id is None and update.effective_chat:
-        chat_id = update.effective_chat.id
-        set_meta(cfg.db_path, "chat_id", str(chat_id))
-        cfg = hydrate_chat_id_from_db(cfg)
-        application.bot_data["cfg"] = cfg
-        _start_scheduler_if_needed(application)
-
-    await update.message.reply_text(
-        "OK. Utilise /identifiant pour récupérer ton CHAT_ID.\n"
-        "Utilise /prochain (ou /article) pour recevoir le prochain article non envoyé.",
-    )
+    cfg = context.application.bot_data["cfg"]
+    _register_effective_user(update, cfg.db_path)
+    if update.message is not None:
+        await update.message.reply_text(
+            "OK. Tu es inscrit pour les notifications.\n"
+            "Utilise /prochain (ou /article) pour recevoir le prochain article non envoyé.",
+        )
 
 
 async def cmd_chatid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     assert update.effective_chat
-    await update.message.reply_text(f"CHAT_ID = {update.effective_chat.id}")
+    await update.message.reply_text(f"USER_ID = {update.effective_chat.id}")
 
 
 async def cmd_next(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     cfg = context.application.bot_data["cfg"]
-    chat_id = cfg.chat_id or (update.effective_chat.id if update.effective_chat else None)
-    if chat_id is None:
-        await update.message.reply_text("Impossible de déterminer le chat_id.")
+    if not _register_effective_user(update, cfg.db_path):
+        if update.message is not None:
+            await update.message.reply_text("Cette commande est disponible uniquement en message privé avec le bot.")
         return
-    ok = await send_next_unsent(context.application, cfg.db_path, chat_id)
+
+    assert update.effective_chat
+    assert update.effective_user
+    ok = await send_next_unsent(
+        context.application,
+        cfg.db_path,
+        update.effective_user.id,
+        update.effective_chat.id,
+    )
     if not ok:
         await update.message.reply_text("Aucun nouvel article trouvé (tous déjà envoyés ?).")
 
 
-async def post_init(application: Application) -> None:
-    _start_scheduler_if_needed(application)
+async def on_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_member_update = update.my_chat_member
+    if chat_member_update is None or chat_member_update.chat.type != "private":
+        return
+
+    was_active, is_active = _extract_was_active_is_active(chat_member_update)
+    cfg = context.application.bot_data["cfg"]
+    user = chat_member_update.from_user
+
+    if is_active:
+        await asyncio.to_thread(
+            upsert_user,
+            cfg.db_path,
+            user_id=user.id,
+            chat_id=chat_member_update.chat.id,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+        )
+        if not was_active:
+            log.info("Registered user %s after my_chat_member activation.", user.id)
+        return
+
+    if was_active and not is_active:
+        await asyncio.to_thread(delete_user, cfg.db_path, user.id)
+        log.info("Deleted user %s after my_chat_member deactivation.", user.id)
 
 
 def _start_scheduler_if_needed(application: Application) -> None:
-    # Démarre une seule fois (post_init ou après auto-enregistrement du chat_id).
     if application.bot_data.get("scheduler_started"):
         return
     cfg = application.bot_data["cfg"]
-    if cfg.chat_id is None:
-        log.warning("CHAT_ID absent: le scheduler ne démarrera pas tant qu’il n’est pas configuré.")
-        return
     start_scheduler(
         application,
         db_path=cfg.db_path,
-        chat_id=cfg.chat_id,
         tz=cfg.tz,
         daily_time=cfg.daily_time,
         check_interval_min=cfg.check_interval_min,
@@ -79,12 +124,10 @@ def _start_scheduler_if_needed(application: Application) -> None:
 def build_app() -> Application:
     cfg = load_config()
     init_db(cfg.db_path)
-    cfg = hydrate_chat_id_from_db(cfg)
 
     application = (
         Application.builder()
         .token(cfg.bot_token)
-        .post_init(post_init)
         .build()
     )
     application.bot_data["cfg"] = cfg
@@ -94,6 +137,7 @@ def build_app() -> Application:
     application.add_handler(CommandHandler(["start", "demarrer"], cmd_start))
     application.add_handler(CommandHandler(["identifiant", "chatid"], cmd_chatid))
     application.add_handler(CommandHandler(["prochain", "article", "next"], cmd_next))
+    application.add_handler(ChatMemberHandler(on_my_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))
 
     return application
 
@@ -102,6 +146,7 @@ async def amain() -> None:
     app = build_app()
     await app.initialize()
     await app.start()
+    _start_scheduler_if_needed(app)
     await app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
     log.info("Polling started.")
     await asyncio.Event().wait()

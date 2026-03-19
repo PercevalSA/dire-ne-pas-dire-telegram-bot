@@ -23,7 +23,7 @@ source .venv/bin/activate
 python -m pip install .
 ```
 
-### Installation pour déploiement 
+### Installation pour déploiement
 
 ```bash
 python3 -m pip install https://github.com/PercevalSA/dire-ne-pas-dire-telegram-bot.git
@@ -34,7 +34,6 @@ python3 -m pip install https://github.com/PercevalSA/dire-ne-pas-dire-telegram-b
 Variables d’environnement attendues :
 
 - `BOT_TOKEN` (obligatoire) : token Telegram du bot
-- `CHAT_ID` (optionnel) : id du chat (toi). Si absent, le bot l’enregistre automatiquement au premier `/start` et utilise directement le DM.
 - `TZ` (optionnel) : timezone, défaut `Europe/Paris`
 - `DAILY_TIME` (optionnel) : heure d’envoi quotidien `HH:MM`, défaut `09:00`
 - `CHECK_INTERVAL_MIN` (optionnel) : minutes entre vérifications “nouvel article”, défaut `60`
@@ -44,12 +43,14 @@ Exemple :
 
 ```bash
 export BOT_TOKEN="123:abc"
-export CHAT_ID="123456789"
 export TZ="Europe/Paris"
 export DAILY_TIME="09:00"
 export CHECK_INTERVAL_MIN="60"
 export DB_PATH="/var/lib/dire-ne-pas-dire-telegram-bot/bot.db"
 ```
+
+Le bot est multi-utilisateur : chaque utilisateur qui lance `/start` en message privé est enregistré en base et reçoit ses notifications selon son propre historique d’articles envoyés.
+Si Telegram envoie une mise à jour `my_chat_member` indiquant que le bot a été bloqué, supprimé ou retiré du chat privé, l’utilisateur est supprimé de la base ainsi que tout son historique d’envoi.
 
 ## Lancer en local
 
@@ -62,8 +63,9 @@ python -m dire_ne_pas_dire_telegram_bot
 ```
 
 Dans Telegram :
+
 - `/demarrer` (ou `/start`) pour confirmer que le bot répond
-- `/identifiant` (ou `/chatid`) pour voir l’id du chat (debug)
+- `/identifiant` (ou `/chatid`) pour voir l’identifiant utilisateur (debug)
 - `/prochain` ou `/article` (ou `/next`) pour recevoir immédiatement le prochain article non envoyé
 
 ## Déploiement Linux (systemd)
@@ -72,23 +74,26 @@ Ici on suppose une installation pour déploiement.
 
 - `systemd` crée automatiquement le dossier de données via `StateDirectory=`
 - l’utilisateur du service peut être créé automatiquement via `DynamicUser=yes`
-- systemd` créé automatiquement le fichier de configuration dans `StateDirectory`
 
+1. Ajoute le token du bot dans le fichier d’environnement.
 
- 1. Ajoute le token du bot dans le fichier d’environnement
- 2. Copie l’unité systemd fournie par le projet
-    ```bash
-    wget -O dire-ne-pas-dire-telegram-bot.service https://raw.githubusercontent.com/PercevalSA/dire-ne-pas-dire-telegram-bot/main/deploy/dire-ne-pas-dire-telegram-bot.service
-    sudo cp dire-ne-pas-dire-telegram-bot.service /etc/systemd/system/dire-ne-pas-dire-telegram-bot.service
-    ```
+1. Copie l’unité systemd fournie par le projet.
+
+```bash
+wget -O dire-ne-pas-dire-telegram-bot.service https://raw.githubusercontent.com/PercevalSA/dire-ne-pas-dire-telegram-bot/main/deploy/dire-ne-pas-dire-telegram-bot.service
+sudo cp dire-ne-pas-dire-telegram-bot.service /etc/systemd/system/dire-ne-pas-dire-telegram-bot.service
+```
+
+1. Installe le package Python.
+
+```bash
 sudo /opt/dnpd-telegram-bot/venv/bin/pip install dire-ne-pas-dire-telegram-bot
 ```
 
-4) Recharge systemd et démarre le service :
+1. Recharge systemd et démarre le service.
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now dire-ne-pas-dire-telegram-bot.service
 sudo systemctl status dire-ne-pas-dire-telegram-bot.service
 ```
-
